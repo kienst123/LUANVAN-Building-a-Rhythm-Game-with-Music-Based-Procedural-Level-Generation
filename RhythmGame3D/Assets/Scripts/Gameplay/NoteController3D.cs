@@ -147,7 +147,9 @@ namespace RhythmGame3D.Gameplay
             
             // Position behind the head
             tailObject.transform.localPosition = new Vector3(0, 0, longNoteLength / 2f);
-            tailObject.transform.localScale = new Vector3(1f, 1f, longNoteLength);
+            
+            // SCALE: Chiều rộng/cao = 0.8 (giống note head), chiều dài theo duration
+            tailObject.transform.localScale = new Vector3(0.8f, 0.8f, longNoteLength);
             
             // Color will be set by SetColor() method later
             // Just get the renderer ready
@@ -156,7 +158,7 @@ namespace RhythmGame3D.Gameplay
             // Remove collider
             Destroy(tailObject.GetComponent<Collider>());
             
-            Debug.Log($"[NoteController3D] Created long note tail, length: {longNoteLength}");
+            Debug.Log($"[NoteController3D] Created long note tail, duration: {duration:F2}s, length: {longNoteLength:F2} units");
         }
         
         /// <summary>

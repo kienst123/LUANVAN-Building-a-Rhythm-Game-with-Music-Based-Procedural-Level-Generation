@@ -345,6 +345,46 @@ namespace RhythmGame3D.UI.Menu3D
         
         void GenerateBeatmap(string musicPath)
         {
+            // Load audio clip để lấy độ dài chính xác
+            StartCoroutine(GenerateBeatmapCoroutine(musicPath));
+        }
+        
+        System.Collections.IEnumerator GenerateBeatmapCoroutine(string musicPath)
+        {
+            // Load audio clip
+            string fileUrl = "file://" + musicPath;
+            
+            #if UNITY_2017_1_OR_NEWER
+            using (UnityEngine.Networking.UnityWebRequest www = UnityEngine.Networking.UnityWebRequestMultimedia.GetAudioClip(fileUrl, AudioType.UNKNOWN))
+            {
+                yield return www.SendWebRequest();
+                
+                float songDuration = 90f; // Default fallback
+                
+                if (www.result == UnityEngine.Networking.UnityWebRequest.Result.Success)
+                {
+                    AudioClip clip = UnityEngine.Networking.DownloadHandlerAudioClip.GetContent(www);
+                    if (clip != null)
+                    {
+                        songDuration = clip.length;
+                        Debug.Log($"[BeatmapSelector3D] Audio duration from clip: {songDuration:F2}s");
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning($"[BeatmapSelector3D] Could not load audio, using default duration: {songDuration}s");
+                }
+            #else
+            WWW www = new WWW(fileUrl);
+            yield return www;
+            
+            float songDuration = 90f;
+            if (www.GetAudioClip() != null)
+            {
+                songDuration = www.GetAudioClip().length;
+            }
+            #endif
+            
             // Simple beatmap generation
             generatedBeatmap = new BeatmapData();
             generatedBeatmap.audioFilename = Path.GetFileName(musicPath);
@@ -352,63 +392,62 @@ namespace RhythmGame3D.UI.Menu3D
             generatedBeatmap.artist = "Unknown";
             generatedBeatmap.creator = "Auto-Generated";
             
+            Debug.Log($"[BeatmapSelector3D] Song duration: {songDuration:F2}s");
+            
             // Generate simple pattern (every beat)
             float bpm = 120f;
-            float beatDuration = 60f / bpm;
+            float beatDuration = 60f / bpm; // 0.5 giây mỗi beat
             
-            // SỐ NOTE DỰA TRÊN ĐỘ KHÓ
-            int noteCount;
-            float noteSpacing; // Khoảng cách giữa các note
+            // KHOẢNG CÁCH GIỮA CÁC NOTE DỰA TRÊN ĐỘ KHÓ
+            float noteSpacing;
             switch (currentDifficulty)
             {
                 case 0: // EASY
-                    noteCount = 40;
-                    noteSpacing = 1.0f; // 1 beat spacing
+                    noteSpacing = 1.0f; // 1 beat spacing (0.5s)
                     break;
                 case 1: // NORMAL
-                    noteCount = 70;
-                    noteSpacing = 0.75f; // 0.75 beat spacing
+                    noteSpacing = 0.75f; // 0.75 beat spacing (0.375s)
                     break;
                 case 2: // HARD
-                    noteCount = 120;
-                    noteSpacing = 0.5f; // 0.5 beat spacing
+                    noteSpacing = 0.5f; // 0.5 beat spacing (0.25s)
                     break;
                 default:
-                    noteCount = 70;
                     noteSpacing = 0.75f;
                     break;
             }
             
+            // TÍNH SỐ NOTE DỰA TRÊN ĐỘ DÀI BÀI HÁT
+            float timePerNote = beatDuration * noteSpacing;
+            int noteCount = Mathf.FloorToInt(songDuration / timePerNote);
+            
+            Debug.Log($"[BeatmapSelector3D] Generating {noteCount} notes for {songDuration:F2}s song ({GetDifficultyName()})");
+            
+            // ĐỂ TRÁNH 2 NOTE CÙNG LANE LIÊN TIẾP, dùng lastLane
+            int lastLane = -1;
+            
             for (int i = 0; i < noteCount; i++)
             {
-                int lane = i % 4; // Cycle through 4 lanes (0-3)
+                // RANDOM LANE (0-3), nhưng tránh trùng với note trước
+                int lane;
+                int maxAttempts = 10;
+                int attempts = 0;
+                
+                do
+                {
+                    lane = Random.Range(0, 4);
+                    attempts++;
+                } while (lane == lastLane && attempts < maxAttempts);
+                
+                lastLane = lane;
+                
                 int xPos = 64 + (lane * 128); // osu!mania 4K positions: 64, 192, 320, 448
                 int noteTime = Mathf.RoundToInt(i * beatDuration * noteSpacing * 1000); // Convert to milliseconds
                 
-                // HARD có nhiều long note hơn
-                bool isLongNote = false;
-                if (currentDifficulty == 2)
-                {
-                    isLongNote = (i % 6 == 0); // Mỗi note thứ 6 là long note
-                }
-                else if (currentDifficulty == 1)
-                {
-                    isLongNote = (i % 8 == 0); // Mỗi note thứ 8 là long note
-                }
-                else
-                {
-                    isLongNote = (i % 12 == 0); // Mỗi note thứ 12 là long note (Easy ít long note)
-                }
-                
-                int noteType = isLongNote ? 128 : 1; // 128 = long note, 1 = tap
+                // KHÔNG TẠO LONG NOTE trong auto-generate (chỉ tap notes)
+                // Long note phức tạp và cần beatmap .osu thật để hoạt động tốt
+                int noteType = 1; // Chỉ tạo tap note (type 1)
                 
                 HitObject note = new HitObject(xPos, 192, noteTime, noteType, 0);
-                
-                // Set end time for long notes
-                if (note.isLongNote)
-                {
-                    note.endTime = noteTime + Mathf.RoundToInt(beatDuration * 2 * 1000);
-                }
                 
                 generatedBeatmap.AddHitObject(note);
             }
@@ -422,9 +461,13 @@ namespace RhythmGame3D.UI.Menu3D
             // Cập nhật info text với thông tin độ khó
             if (infoText != null)
             {
-                infoText.text = $"Ready to play!\nDifficulty: {GetDifficultyName()}\nNotes: {noteCount}\n\nClick PLAY to start";
+                infoText.text = $"Ready to play!\nDifficulty: {GetDifficultyName()}\nNotes: {noteCount}\nDuration: ~{songDuration:F0}s\n\nClick PLAY to start";
                 infoText.color = new Color(0.7f, 0.7f, 0.7f);
             }
+            
+            #if UNITY_2017_1_OR_NEWER
+            }
+            #endif
         }
         
         void OnPlayClicked()

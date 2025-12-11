@@ -24,6 +24,9 @@ namespace RhythmGame3D.Core
         [Header("Visual Effects")]
         public GameplayTunnelBackground tunnelBackground;
         
+        [Header("Results Screen")]
+        public ResultsScreen3D resultsScreen;
+        
         [Header("Beatmap")]
         public string beatmapFilePath;
         
@@ -42,6 +45,14 @@ namespace RhythmGame3D.Core
         private float songTime = 0f;
         private float currentHealth = 100f;
         
+        // Judgment tracking
+        private int perfectCount = 0;
+        private int greatCount = 0;
+        private int goodCount = 0;
+        private int missCount = 0;
+        private int maxCombo = 0;
+        private int totalNotes = 0;
+        
         void Start()
         {
             Initialize();
@@ -55,6 +66,14 @@ namespace RhythmGame3D.Core
                 GameObject tunnelObj = new GameObject("GameplayTunnelBackground");
                 tunnelBackground = tunnelObj.AddComponent<GameplayTunnelBackground>();
                 Debug.Log("[GameManager3D] Created tunnel background");
+            }
+            
+            // Setup results screen if not assigned
+            if (resultsScreen == null)
+            {
+                GameObject resultsObj = new GameObject("ResultsScreen3D");
+                resultsScreen = resultsObj.AddComponent<ResultsScreen3D>();
+                Debug.Log("[GameManager3D] Created results screen");
             }
             
             // Subscribe to judgment events
@@ -76,6 +95,10 @@ namespace RhythmGame3D.Core
                 Debug.Log($"[GameManager3D] Loading beatmap from 3D menu selection");
                 currentBeatmap = BeatmapStorage.currentBeatmap;
                 
+                // Count total notes
+                totalNotes = currentBeatmap.hitObjects.Count;
+                Debug.Log($"[GameManager3D] Total notes: {totalNotes}");
+                
                 // Load into spawner
                 if (noteSpawner != null)
                 {
@@ -94,6 +117,10 @@ namespace RhythmGame3D.Core
             {
                 Debug.Log($"[GameManager3D] Loading beatmap from old menu selection");
                 currentBeatmap = BeatmapSelector.currentBeatmap;
+                
+                // Count total notes
+                totalNotes = currentBeatmap.hitObjects.Count;
+                Debug.Log($"[GameManager3D] Total notes: {totalNotes}");
                 
                 // Load into spawner
                 if (noteSpawner != null)
@@ -136,6 +163,10 @@ namespace RhythmGame3D.Core
                 Debug.LogError("[GameManager3D] Failed to load beatmap!");
                 return;
             }
+            
+            // Count total notes
+            totalNotes = currentBeatmap.hitObjects.Count;
+            Debug.Log($"[GameManager3D] Total notes: {totalNotes}");
             
             // Load into spawner
             if (noteSpawner != null)
@@ -350,6 +381,16 @@ namespace RhythmGame3D.Core
         /// </summary>
         void OnJudgmentReceived(JudgmentResult result)
         {
+            // Track judgment counts
+            if (result.judgment == "Perfect")
+                perfectCount++;
+            else if (result.judgment == "Great")
+                greatCount++;
+            else if (result.judgment == "Good")
+                goodCount++;
+            else if (result.judgment == "Miss")
+                missCount++;
+            
             // Pulse tunnel on perfect hits
             if (result.judgment == "Perfect" && tunnelBackground != null)
             {
@@ -408,6 +449,12 @@ namespace RhythmGame3D.Core
         /// </summary>
         void OnComboChanged(int combo)
         {
+            // Track max combo
+            if (combo > maxCombo)
+            {
+                maxCombo = combo;
+            }
+            
             // Play combo break sound if combo dropped to 0 from a higher value
             if (combo == 0 && judgmentSystem != null && judgmentSystem.maxCombo > 0)
             {
@@ -467,7 +514,24 @@ namespace RhythmGame3D.Core
             Debug.Log("[GameManager3D] Song ended!");
             Debug.Log(judgmentSystem.ToString());
             
-            // Show results screen (to be implemented)
+            // Show results screen
+            if (resultsScreen != null && judgmentSystem != null)
+            {
+                int finalScore = judgmentSystem.totalScore;
+                float accuracy = judgmentSystem.accuracy;
+                
+                resultsScreen.ShowResults(
+                    finalScore,
+                    accuracy,
+                    maxCombo,
+                    perfectCount,
+                    greatCount,
+                    goodCount,
+                    missCount
+                );
+                
+                Debug.Log($"[GameManager3D] Results: Score={finalScore}, Acc={accuracy:F2}%, MaxCombo={maxCombo}, P/G/G/M={perfectCount}/{greatCount}/{goodCount}/{missCount}");
+            }
         }
         
         /// <summary>
