@@ -3,6 +3,7 @@ using UnityEngine.SceneManagement;
 using RhythmGame3D.Beatmap;
 using RhythmGame3D.Gameplay;
 using RhythmGame3D.UI;
+using RhythmGame3D.UI.Menu3D;
 
 namespace RhythmGame3D.Core
 {
@@ -19,6 +20,9 @@ namespace RhythmGame3D.Core
         public ModernUIManager3D uiManager;
         public AudioManager3D audioManager;
         public AudioSource musicSource;
+        
+        [Header("Visual Effects")]
+        public GameplayTunnelBackground tunnelBackground;
         
         [Header("Beatmap")]
         public string beatmapFilePath;
@@ -45,6 +49,14 @@ namespace RhythmGame3D.Core
         
         void Initialize()
         {
+            // Setup tunnel background if not assigned
+            if (tunnelBackground == null)
+            {
+                GameObject tunnelObj = new GameObject("GameplayTunnelBackground");
+                tunnelBackground = tunnelObj.AddComponent<GameplayTunnelBackground>();
+                Debug.Log("[GameManager3D] Created tunnel background");
+            }
+            
             // Subscribe to judgment events
             if (judgmentSystem != null)
             {
@@ -58,10 +70,29 @@ namespace RhythmGame3D.Core
                 inputManager.OnEmptyPress += OnEmptyPress;
             }
             
-            // Check if beatmap was passed from menu
-            if (BeatmapSelector.currentBeatmap != null)
+            // Check if beatmap was passed from menu (check both old and new systems)
+            if (BeatmapStorage.currentBeatmap != null)
             {
-                Debug.Log($"[GameManager3D] Loading beatmap from menu selection");
+                Debug.Log($"[GameManager3D] Loading beatmap from 3D menu selection");
+                currentBeatmap = BeatmapStorage.currentBeatmap;
+                
+                // Load into spawner
+                if (noteSpawner != null)
+                {
+                    noteSpawner.LoadBeatmap(currentBeatmap);
+                }
+                
+                // Load music from path
+                if (!string.IsNullOrEmpty(BeatmapStorage.currentMusicPath))
+                {
+                    LoadMusicFromFile(BeatmapStorage.currentMusicPath);
+                }
+                
+                Debug.Log($"[GameManager3D] Beatmap loaded from 3D menu!");
+            }
+            else if (BeatmapSelector.currentBeatmap != null)
+            {
+                Debug.Log($"[GameManager3D] Loading beatmap from old menu selection");
                 currentBeatmap = BeatmapSelector.currentBeatmap;
                 
                 // Load into spawner
@@ -76,7 +107,7 @@ namespace RhythmGame3D.Core
                     LoadMusicFromFile(BeatmapSelector.currentMusicPath);
                 }
                 
-                Debug.Log($"[GameManager3D] Beatmap loaded from menu!");
+                Debug.Log($"[GameManager3D] Beatmap loaded from old menu!");
             }
             // Otherwise, load beatmap if path specified
             else if (!string.IsNullOrEmpty(beatmapFilePath))
@@ -319,6 +350,12 @@ namespace RhythmGame3D.Core
         /// </summary>
         void OnJudgmentReceived(JudgmentResult result)
         {
+            // Pulse tunnel on perfect hits
+            if (result.judgment == "Perfect" && tunnelBackground != null)
+            {
+                tunnelBackground.PulseOnBeat();
+            }
+            
             // Play hit sound
             if (audioManager != null)
             {
@@ -383,6 +420,13 @@ namespace RhythmGame3D.Core
             if (uiManager != null)
             {
                 uiManager.UpdateCombo(combo);
+            }
+            
+            // Update tunnel intensity based on combo
+            if (tunnelBackground != null)
+            {
+                float intensity = Mathf.Clamp01(combo / 100f); // Max intensity at 100 combo
+                tunnelBackground.SetIntensity(intensity);
             }
         }
         

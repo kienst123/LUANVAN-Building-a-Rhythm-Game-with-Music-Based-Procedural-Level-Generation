@@ -93,7 +93,7 @@ namespace RhythmGame3D.UI.Menu3D
             // Create beatmap panel if not assigned (closer and larger)
             if (beatmapPanel3D == null)
             {
-                beatmapPanel3D = CreatePanel3D("BeatmapPanel3D", new Vector3(0f, 0f, 8f));
+                beatmapPanel3D = CreateBeatmapPanel3D(new Vector3(0f, 0f, 8f));
                 beatmapPanel3D.SetActive(false);
             }
             else
@@ -104,7 +104,7 @@ namespace RhythmGame3D.UI.Menu3D
             // Create settings panel if not assigned (closer and larger)
             if (settingsPanel3D == null)
             {
-                settingsPanel3D = CreatePanel3D("SettingsPanel3D", new Vector3(0f, 0f, 8f));
+                settingsPanel3D = CreateSettingsPanel3D(new Vector3(0f, 0f, 8f));
                 settingsPanel3D.SetActive(false);
             }
             else
@@ -113,6 +113,59 @@ namespace RhythmGame3D.UI.Menu3D
             }
             
             Debug.Log("[MainMenu3D] Panels setup complete - all hidden");
+        }
+        
+        /// <summary>
+        /// Create beatmap selector panel with functional UI
+        /// </summary>
+        GameObject CreateBeatmapPanel3D(Vector3 position)
+        {
+            GameObject panel = new GameObject("BeatmapPanel3D");
+            panel.transform.position = position;
+            
+            // Add BeatmapSelector3D component
+            BeatmapSelector3D selector = panel.AddComponent<BeatmapSelector3D>();
+            selector.menuManager = this;
+            
+            // Add back button
+            GameObject backButton = CreateMenuButton("BACK", Vector3.zero);
+            backButton.transform.parent = panel.transform;
+            backButton.transform.localPosition = new Vector3(0f, -5f, 0f);
+            backButton.transform.localScale = Vector3.one * 0.7f;
+            
+            MenuButton3D backScript = backButton.GetComponent<MenuButton3D>();
+            backScript.AddClickListener(() => {
+                panel.SetActive(false);
+                ShowMainMenu();
+            });
+            
+            return panel;
+        }
+        
+        /// <summary>
+        /// Create settings panel with functional UI
+        /// </summary>
+        GameObject CreateSettingsPanel3D(Vector3 position)
+        {
+            GameObject panel = new GameObject("SettingsPanel3D");
+            panel.transform.position = position;
+            
+            // Add SettingsManager3D component
+            SettingsManager3D settings = panel.AddComponent<SettingsManager3D>();
+            
+            // Add back button
+            GameObject backButton = CreateMenuButton("BACK", Vector3.zero);
+            backButton.transform.parent = panel.transform;
+            backButton.transform.localPosition = new Vector3(0f, -5f, 0f);
+            backButton.transform.localScale = Vector3.one * 0.7f;
+            
+            MenuButton3D backScript = backButton.GetComponent<MenuButton3D>();
+            backScript.AddClickListener(() => {
+                panel.SetActive(false);
+                ShowMainMenu();
+            });
+            
+            return panel;
         }
         
         /// <summary>
