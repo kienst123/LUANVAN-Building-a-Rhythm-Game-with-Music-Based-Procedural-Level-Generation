@@ -3,6 +3,7 @@ using TMPro;
 using RhythmGame3D.Beatmap;
 using RhythmGame3D.UI;
 using System.IO;
+using System.Collections;
 
 namespace RhythmGame3D.UI.Menu3D
 {
@@ -26,13 +27,25 @@ namespace RhythmGame3D.UI.Menu3D
         [Header("References")]
         public MainMenu3DManager menuManager;
         
+        [Header("ML Generation")]
+        public bool useMLGeneration = true; // Toggle giữa ML và simple generation
+        public float mlTimeout = 120f; // 2 phút timeout cho ML generation
+        
         private string selectedMusicFile = "";
         private BeatmapData generatedBeatmap;
         private int currentDifficulty = 1; // 0=Easy, 1=Normal, 2=Hard (mặc định Normal)
+        private PythonMLBridge mlBridge;
+        private bool isGenerating = false;
         
         void Start()
         {
             SetupUI();
+            
+            // Initialize ML bridge
+            mlBridge = new PythonMLBridge();
+            mlBridge.OnProgress += OnMLProgress;
+            mlBridge.OnComplete += OnMLComplete;
+            mlBridge.OnError += OnMLError;
         }
         
         void SetupUI()
@@ -345,8 +358,16 @@ namespace RhythmGame3D.UI.Menu3D
         
         void GenerateBeatmap(string musicPath)
         {
-            // Load audio clip để lấy độ dài chính xác
-            StartCoroutine(GenerateBeatmapCoroutine(musicPath));
+            if (useMLGeneration && !isGenerating)
+            {
+                // Thử dùng ML generation trước
+                StartCoroutine(GenerateBeatmapML(musicPath));
+            }
+            else
+            {
+                // Fallback: Simple generation
+                StartCoroutine(GenerateBeatmapCoroutine(musicPath));
+            }
         }
         
         System.Collections.IEnumerator GenerateBeatmapCoroutine(string musicPath)
@@ -486,6 +507,154 @@ namespace RhythmGame3D.UI.Menu3D
             
             // Load gameplay scene
             UnityEngine.SceneManagement.SceneManager.LoadScene("GameScene");
+        }
+        
+        // ========== ML GENERATION METHODS ==========
+        
+        /// <summary>
+        /// Generate beatmap sử dụng ML model (BEaRT)
+        /// </summary>
+        System.Collections.IEnumerator GenerateBeatmapML(string musicPath)
+        {
+            isGenerating = true;
+            
+            Debug.Log($"[BeatmapSelector3D] Starting ML generation for: {Path.GetFileName(musicPath)}");
+            
+            // Update UI - Đang generate
+            if (infoText != null)
+            {
+                infoText.text = "Generating beatmap with AI...\nPlease wait (30-60 seconds)";
+                infoText.color = new Color(1f, 1f, 0f); // Yellow
+            }
+            
+            // Map Unity difficulty (0-2) → ML difficulty (0.0-1.0)
+            float mlDifficulty = currentDifficulty switch
+            {
+                0 => 0.33f, // Easy
+                1 => 0.50f, // Normal
+                2 => 0.75f, // Hard
+                _ => 0.50f
+            };
+            
+            // Temporary output path
+            string tempDir = Path.Combine(Application.temporaryCachePath, "ML_Beatmaps");
+            if (!Directory.Exists(tempDir))
+            {
+                Directory.CreateDirectory(tempDir);
+            }
+            
+            string outputFileName = $"{Path.GetFileNameWithoutExtension(musicPath)}_{GetDifficultyName()}.osu";
+            string outputPath = Path.Combine(tempDir, outputFileName);
+            
+            Debug.Log($"[BeatmapSelector3D] ML output path: {outputPath}");
+            
+            // Start ML generation
+            bool mlSuccess = false;
+            yield return mlBridge.GenerateBeatmap(musicPath, mlDifficulty, outputPath, mlTimeout);
+            
+            // Check if ML generation succeeded
+            if (File.Exists(outputPath))
+            {
+                Debug.Log($"[BeatmapSelector3D] ML generation successful! Parsing beatmap...");
+                
+                // Parse generated .osu file
+                try
+                {
+                    generatedBeatmap = BeatmapParser.ParseBeatmap(outputPath);
+                    
+                    // Override audio filename with original path
+                    generatedBeatmap.audioFilename = Path.GetFileName(musicPath);
+                    
+                    // Store for gameplay
+                    BeatmapStorage.currentBeatmap = generatedBeatmap;
+                    BeatmapStorage.currentMusicPath = musicPath;
+                    
+                    mlSuccess = true;
+                    
+                    // Update UI - Success
+                    if (infoText != null)
+                    {
+                        int noteCount = generatedBeatmap.hitObjects.Count;
+                        infoText.text = $"✅ AI Beatmap Generated!\nDifficulty: {GetDifficultyName()}\nNotes: {noteCount}\n\nClick PLAY to start";
+                        infoText.color = new Color(0f, 1f, 0.5f); // Green
+                    }
+                    
+                    Debug.Log($"[BeatmapSelector3D] ✅ ML beatmap parsed: {generatedBeatmap.hitObjects.Count} notes");
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogError($"[BeatmapSelector3D] Failed to parse ML beatmap: {e.Message}");
+                    mlSuccess = false;
+                }
+            }
+            
+            // Fallback nếu ML fail
+            if (!mlSuccess)
+            {
+                Debug.LogWarning($"[BeatmapSelector3D] ML generation failed, using simple generation");
+                
+                if (infoText != null)
+                {
+                    infoText.text = "AI generation failed\nUsing simple generation...";
+                    infoText.color = new Color(1f, 0.5f, 0f); // Orange
+                }
+                
+                yield return new WaitForSeconds(1f);
+                
+                // Fallback to simple generation
+                yield return GenerateBeatmapCoroutine(musicPath);
+            }
+            
+            isGenerating = false;
+        }
+        
+        /// <summary>
+        /// ML progress callback
+        /// </summary>
+        void OnMLProgress(string stage, string message)
+        {
+            Debug.Log($"[ML Progress] {stage}: {message}");
+            
+            if (infoText != null)
+            {
+                string displayMessage = stage switch
+                {
+                    "import" => "Loading AI libraries...",
+                    "validate" => "Validating input...",
+                    "download" => "Downloading AI model...",
+                    "load_model" => "Loading neural network...",
+                    "generate" => "AI is analyzing music...",
+                    "convert" => "Converting to beatmap...",
+                    "verify" => "Verifying output...",
+                    "complete" => "Generation complete!",
+                    _ => message
+                };
+                
+                infoText.text = $"🤖 AI Generation\n{displayMessage}\n\nPlease wait...";
+                infoText.color = new Color(0f, 0.94f, 1f); // Cyan
+            }
+        }
+        
+        /// <summary>
+        /// ML complete callback
+        /// </summary>
+        void OnMLComplete(string outputPath)
+        {
+            Debug.Log($"[ML Complete] Beatmap saved to: {outputPath}");
+        }
+        
+        /// <summary>
+        /// ML error callback
+        /// </summary>
+        void OnMLError(string errorMessage)
+        {
+            Debug.LogError($"[ML Error] {errorMessage}");
+            
+            if (infoText != null)
+            {
+                infoText.text = $"❌ AI generation failed:\n{errorMessage}\n\nUsing simple generation...";
+                infoText.color = new Color(1f, 0f, 0f); // Red
+            }
         }
     }
 }
