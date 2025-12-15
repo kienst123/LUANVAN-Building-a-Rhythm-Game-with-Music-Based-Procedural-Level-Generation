@@ -127,11 +127,11 @@ namespace RhythmGame3D.UI.Menu3D
             BeatmapSelector3D selector = panel.AddComponent<BeatmapSelector3D>();
             selector.menuManager = this;
             
-            // Add back button
+            // Add back button (DƯỚI CÙNG)
             GameObject backButton = CreateMenuButton("BACK", Vector3.zero);
             backButton.transform.parent = panel.transform;
-            backButton.transform.localPosition = new Vector3(0f, -5f, 0f);
-            backButton.transform.localScale = Vector3.one * 0.7f;
+            backButton.transform.localPosition = new Vector3(0f, -8f, 0f); // Dời xuống từ -5f → -8f
+            backButton.transform.localScale = Vector3.one * 1.0f;
             
             MenuButton3D backScript = backButton.GetComponent<MenuButton3D>();
             backScript.AddClickListener(() => {
@@ -153,11 +153,11 @@ namespace RhythmGame3D.UI.Menu3D
             // Add SettingsManager3D component
             SettingsManager3D settings = panel.AddComponent<SettingsManager3D>();
             
-            // Add back button
+            // Add back button (DƯỚI CÙNG)
             GameObject backButton = CreateMenuButton("BACK", Vector3.zero);
             backButton.transform.parent = panel.transform;
-            backButton.transform.localPosition = new Vector3(0f, -5f, 0f);
-            backButton.transform.localScale = Vector3.one * 0.7f;
+            backButton.transform.localPosition = new Vector3(0f, -5.5f, 0f); // Dời xuống từ -5f → -5.5f (Settings gần hơn)
+            backButton.transform.localScale = Vector3.one * 1.0f;
             
             MenuButton3D backScript = backButton.GetComponent<MenuButton3D>();
             backScript.AddClickListener(() => {

@@ -28,8 +28,8 @@ namespace RhythmGame3D.UI.Menu3D
         public MainMenu3DManager menuManager;
         
         [Header("ML Generation")]
-        public bool useMLGeneration = true; // Toggle giữa ML và simple generation
-        public float mlTimeout = 120f; // 2 phút timeout cho ML generation
+        public bool useMLGeneration = true; // ✅ BẬT ML! Python test THÀNH CÔNG!
+        public float mlTimeout = 420f; // 7 phút timeout (ML full song mất ~3-6 phút, changed from 180f)
         
         private string selectedMusicFile = "";
         private BeatmapData generatedBeatmap;

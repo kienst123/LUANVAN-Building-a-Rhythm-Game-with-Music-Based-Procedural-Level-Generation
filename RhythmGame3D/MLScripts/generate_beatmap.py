@@ -20,6 +20,15 @@ import os
 import json
 from pathlib import Path
 
+# Add BeatLearning source code to Python path
+beatlearning_path = "/Volumes/KIEN 4TB/LuanVan copy/another/BeatLearning"
+if beatlearning_path not in sys.path:
+    sys.path.insert(0, beatlearning_path)
+
+# Verify path was added
+print(f"DEBUG: Added to sys.path: {beatlearning_path}", file=sys.stderr, flush=True)
+print(f"DEBUG: Path exists: {os.path.exists(beatlearning_path)}", file=sys.stderr, flush=True)
+
 def print_progress(stage, message):
     """Print progress with JSON format for Unity to parse"""
     progress_data = {
@@ -87,38 +96,54 @@ def generate_beatmap(audio_path, difficulty, output_path):
         
         print_progress("load_model", "Loading BEaRT model...")
         
+        # Determine device first
+        import torch
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        print_progress("device", f"Using device: {device}")
+        
         # Initialize tokenizer and model
         tokenizer = BEaRTTokenizer(QuaverBEaRT())
         model = BEaRT(tokenizer)
-        model.load(checkpoint)
         
-        # Use CPU by default (GPU if available)
-        try:
-            import torch
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            model.to(device)
-            print_progress("device", f"Using device: {device}")
-        except:
-            print_progress("device", "Using device: CPU")
+        # Load model with map_location for CPU compatibility and weights_only=False for legacy models
+        model.load(checkpoint, map_location=torch.device(device), weights_only=False)
+        model.to(device)
         
         # Stage 4: Generate beatmap
         print_progress("generate", f"Generating beatmap (difficulty={difficulty:.2f})...")
         
+        # OPTIMIZED PARAMETERS for faster CPU generation:
+        # - Reduced beams: [2]*8 → [2]*4 (balanced)
+        # - Reduced max_beam_width: 256 → 64 (4x faster)
+        # - Higher temperature: 0.1 → 0.2 (slightly more randomness)
+        # Trade-off: Slightly lower quality but much faster for CPU
+        
+        # FULL SONG GENERATION
+        # Note: This will take 3-6 minutes for a 3-4 minute song on CPU
+        # If you want faster testing, change audio_end_limit to 90.0
+        audio_end_limit = None  # Generate full song (changed from 90.0)
+        
         ibf = model.generate(
             audio_file=audio_path,
             audio_start=0.0,
-            audio_end=None,  # Generate for full song
+            audio_end=audio_end_limit,  # None = full song
             use_tracks=["LEFT"],  # OSU mode uses only LEFT track
             difficulty=float(difficulty),
-            beams=[2] * 8,  # Beam search configuration
-            max_beam_width=256,  # Balance between speed and accuracy
-            temperature=0.1,  # Low temperature = more consistent
+            beams=[2] * 4,  # Reduced from [2]*8 for speed
+            max_beam_width=64,  # Reduced from 256 for speed
+            temperature=0.2,  # Increased from 0.1 for speed
             random_seed=42  # Fixed seed for reproducibility
         )
         
+        print_progress("save_ibf", "Saving intermediate beatmap format...")
+        
+        # Stage 5: Save IBF to temporary file first
+        temp_ibf_path = output_path.replace(".osu", ".ibf")
+        ibf.save(temp_ibf_path)
+        
         print_progress("convert", "Converting to .osu format...")
         
-        # Stage 5: Convert to .osu format
+        # Stage 6: Convert IBF to .osu format
         converter = OsuBeatmapConverter()
         
         # Extract metadata from filename
@@ -136,8 +161,8 @@ def generate_beatmap(audio_path, difficulty, output_path):
             diff_name = "Hard"
             overall_diff = 7
         
-        # Generate .osu file
-        converter.generate(ibf, output_path, meta={
+        # Generate .osu file from IBF file
+        converter.generate(temp_ibf_path, output_path, meta={
             "title": song_name,
             "artist": "Unknown Artist",
             "creator": "BeatLearning AI",
@@ -147,6 +172,10 @@ def generate_beatmap(audio_path, difficulty, output_path):
             "circle_size": 4,  # 4K mode
             "approach_rate": overall_diff,
         })
+        
+        # Clean up temporary IBF file
+        if os.path.exists(temp_ibf_path):
+            os.remove(temp_ibf_path)
         
         # Stage 6: Verify output
         print_progress("verify", "Verifying generated file...")

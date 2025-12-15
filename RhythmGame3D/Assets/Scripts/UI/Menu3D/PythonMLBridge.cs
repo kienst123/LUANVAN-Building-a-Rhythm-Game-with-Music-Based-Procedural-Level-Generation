@@ -18,7 +18,8 @@ public class PythonMLBridge
     public event Action<string> OnError;             // (errorMessage)
     
     // Configuration
-    private const string PYTHON_COMMAND = "python3";
+    // Use full path to ensure correct Python with installed packages
+    private const string PYTHON_COMMAND = "/Library/Frameworks/Python.framework/Versions/3.11/bin/python3";
     private const float DEFAULT_TIMEOUT = 120f; // 2 phút
     private const int BUFFER_SIZE = 4096;
     
@@ -235,12 +236,16 @@ public class PythonMLBridge
                     int msgEnd = json.IndexOf("\"", msgStart);
                     string message = json.Substring(msgStart, msgEnd - msgStart);
                     
-                    OnProgress?.Invoke(stage, message);
+                    // COMMENTED OUT: OnProgress can't be called from background thread
+                    // Unity event handlers must be called from main thread
+                    // Progress is logged above, that's enough for debugging
+                    // OnProgress?.Invoke(stage, message);
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[PythonMLBridge] Failed to parse progress: {ex.Message}");
+                // Silently ignore progress parse errors - they're not critical
+                // Debug.LogWarning($"[PythonMLBridge] Failed to parse progress: {ex.Message}");
             }
         }
         // Parse success message

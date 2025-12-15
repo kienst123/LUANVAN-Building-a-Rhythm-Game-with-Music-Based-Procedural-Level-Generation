@@ -76,6 +76,16 @@ namespace RhythmGame3D.UI
             CreateButtons();
         }
         
+        /// <summary>
+        /// Configure TextMeshPro to prevent text overflow/wrapping issues
+        /// </summary>
+        void ConfigureTextMeshPro(TextMeshPro tmp)
+        {
+            tmp.enableWordWrapping = false;
+            tmp.overflowMode = TextOverflowModes.Overflow;
+            tmp.horizontalMapping = TextureMappingOptions.Character;
+        }
+        
         void CreateTitle()
         {
             GameObject titleObj = new GameObject("Title");
@@ -88,6 +98,7 @@ namespace RhythmGame3D.UI
             titleText.alignment = TextAlignmentOptions.Center;
             titleText.color = new Color(0f, 0.94f, 1f);
             titleText.fontStyle = TMPro.FontStyles.Bold;
+            ConfigureTextMeshPro(titleText);
         }
         
         void CreateScoreTexts()
@@ -103,6 +114,7 @@ namespace RhythmGame3D.UI
             scoreText.alignment = TextAlignmentOptions.Center;
             scoreText.color = Color.yellow;
             scoreText.fontStyle = TMPro.FontStyles.Bold;
+            ConfigureTextMeshPro(scoreText);
             
             // Accuracy
             GameObject accObj = new GameObject("Accuracy");
@@ -114,6 +126,7 @@ namespace RhythmGame3D.UI
             accuracyText.fontSize = 4;
             accuracyText.alignment = TextAlignmentOptions.Center;
             accuracyText.color = Color.white;
+            ConfigureTextMeshPro(accuracyText);
             
             // Max Combo
             GameObject comboObj = new GameObject("MaxCombo");
@@ -125,6 +138,7 @@ namespace RhythmGame3D.UI
             maxComboText.fontSize = 4;
             maxComboText.alignment = TextAlignmentOptions.Center;
             maxComboText.color = Color.cyan;
+            ConfigureTextMeshPro(maxComboText);
             
             // Grade (S, A, B, C, D, F)
             GameObject gradeObj = new GameObject("Grade");
@@ -137,6 +151,7 @@ namespace RhythmGame3D.UI
             gradeText.alignment = TextAlignmentOptions.Center;
             gradeText.color = Color.white;
             gradeText.fontStyle = TMPro.FontStyles.Bold;
+            ConfigureTextMeshPro(gradeText);
         }
         
         void CreateJudgmentCounts()
@@ -154,6 +169,7 @@ namespace RhythmGame3D.UI
             perfectCountText.fontSize = 3;
             perfectCountText.alignment = TextAlignmentOptions.Center;
             perfectCountText.color = new Color(0f, 1f, 1f); // Cyan
+            ConfigureTextMeshPro(perfectCountText);
             
             // Great
             GameObject greatObj = new GameObject("GreatCount");
@@ -165,6 +181,7 @@ namespace RhythmGame3D.UI
             greatCountText.fontSize = 3;
             greatCountText.alignment = TextAlignmentOptions.Center;
             greatCountText.color = new Color(0f, 1f, 0f); // Green
+            ConfigureTextMeshPro(greatCountText);
             
             // Good
             GameObject goodObj = new GameObject("GoodCount");
@@ -176,6 +193,7 @@ namespace RhythmGame3D.UI
             goodCountText.fontSize = 3;
             goodCountText.alignment = TextAlignmentOptions.Center;
             goodCountText.color = new Color(1f, 1f, 0f); // Yellow
+            ConfigureTextMeshPro(goodCountText);
             
             // Miss
             GameObject missObj = new GameObject("MissCount");
@@ -187,6 +205,7 @@ namespace RhythmGame3D.UI
             missCountText.fontSize = 3;
             missCountText.alignment = TextAlignmentOptions.Center;
             missCountText.color = new Color(1f, 0f, 0f); // Red
+            ConfigureTextMeshPro(missCountText);
         }
         
         void CreateButtons()
@@ -240,6 +259,11 @@ namespace RhythmGame3D.UI
             textMesh.alignment = TextAlignmentOptions.Center;
             textMesh.color = Color.white;
             textMesh.fontStyle = TMPro.FontStyles.Bold;
+            
+            // Fix text overflow/wrapping issues
+            textMesh.enableWordWrapping = false;
+            textMesh.overflowMode = TextOverflowModes.Overflow;
+            textMesh.horizontalMapping = TextureMappingOptions.Character;
             
             // Create glow light
             GameObject lightObj = new GameObject("GlowLight");
